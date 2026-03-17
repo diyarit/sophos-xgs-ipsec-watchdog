@@ -2,13 +2,17 @@
 
 # =============================================================
 # Sophos XGS IPsec Tunnel Watchdog
-# Author: Diyar Abbas (fixes applied)
+# Author: Diyar Abbas
 # Repo: https://github.com/diyarit/sophos-xgs-ipsec-watchdog
-# Fixes:
+# Version: 2.0
+#
+# Fixes applied:
 #   - Interval now in SECONDS instead of minutes for faster recovery
-#   - Tunnel name parsing fixed to preserve full name including suffix
-#   - timeout 30 wrapper added to ipsec reload and ipsec up
-#     to prevent blocking when run from background shell
+#   - Tunnel name parsing fixed to extract correct names from IKE SA
+#     lines (square brackets only) preventing ghost tunnel names like
+#     AZ_S2S-1182 or AZ_S2S_Backup_ISP-1183
+#   - timeout 30 wrapper added to ipsec reload and ipsec up to
+#     prevent blocking when run from a background shell with no TTY
 # =============================================================
 
 if [ -z "$1" ]; then
@@ -19,7 +23,7 @@ if [ -z "$1" ]; then
    echo ""
    echo "configured tunnels on the system:"
    ipsec status > /tmp/ipsec-status.txt
-   tunnel_array=$(awk 'NR>1 {print $1}' /tmp/ipsec-status.txt | tr -d '!"$%&/()=?.*[]:{}' | sort -u)
+   tunnel_array=$(grep '\[' /tmp/ipsec-status.txt | awk '{print $1}' | sed 's/\[.*//' | sort -u)
    for tunnel in $tunnel_array; do
        if ipsec status | grep -q "$tunnel.*INSTALLED"; then
          echo "  [OK] $tunnel"
@@ -38,7 +42,7 @@ do
 
    if [ "$1" = "auto" ]; then
       ipsec status > /tmp/ipsec-status.txt
-      targets=$(awk 'NR>1 {print $1}' /tmp/ipsec-status.txt | tr -d '!"$%&/()=?.*[]:{}' | sort -u)
+      targets=$(grep '\[' /tmp/ipsec-status.txt | awk '{print $1}' | sed 's/\[.*//' | sort -u)
    else
       targets="$1"
    fi
